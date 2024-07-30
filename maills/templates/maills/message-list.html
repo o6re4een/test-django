@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Список сообщений</title>
+    <style>
+      #progress-bar-container {
+        width: 100%;
+        background-color: #f3f3f3;
+        border: 1px solid #ccc;
+        margin-top: 20px;
+      }
+
+      #progress-bar {
+        width: 0%;
+        height: 30px;
+        background-color: #4caf50;
+        text-align: center;
+        color: white;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+      }
+
+      th {
+        background-color: #f2f2f2;
+      }
+
+      .attachments {
+        margin-top: 10px;
+      }
+
+      .attachment-link {
+        margin-right: 5px;
+      }
+    </style>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const progressBar = document.getElementById("progress-bar");
+        const tableBody = document.querySelector("tbody");
+
+        const socket = new WebSocket(
+          "ws://" + window.location.host + "/ws/emails/"
+        );
+
+        socket.onopen = function () {
+          console.log("WebSocket connection opened");
+        };
+
+        socket.onmessage = function (e) {
+          const data = JSON.parse(e.data);
+
+          if (data.type === "progress_update") {
+            const percentage = data.progress;
+            progressBar.style.width = percentage + "%";
+            progressBar.textContent = percentage.toFixed(2) + "%";
+
+            const msg = data.message;
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                        <td>${msg.heading}</td>
+                        <td>${new Date(msg.date_got).toLocaleString()}</td>
+                        <td>${msg.date_sent}</td>
+                        <td>${msg.content}</td>
+                        
+                        <td>
+                            <div class="attachments">
+                              ${
+                                msg.attachments
+                                  .map(
+                                    (att) =>
+                                      `<a href="/attachments/${att.id}/" class="attachment-link">${att.file_name}</a>`
+                                  )
+                                  .join(", ") || "No attachments"
+                              } 
+                            </div>
+                        </td>
+                    `;
+            tableBody.appendChild(row);
+          }
+        };
+
+        socket.onclose = function (e) {
+          console.error("WebSocket connection closed unexpectedly");
+          progressBar.style.backgroundColor = "red";
+          progressBar.textContent = "Connection closed";
+        };
+      });
+    </script>
+  </head>
+  <body>
+    <h2>Список сообщений</h2>
+    <div id="progress-bar-container">
+      <div id="progress-bar">0%</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Тема</th>
+          <th>Дата получения</th>
+          <th>Дата отправки</th>
+          <th>Краткое содержание</th>
+          <th>Вложения</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for message in messages %}
+        <tr>
+          <td>{{ message.heading }}</td>
+          <td>{{ message.date_got }}</td>
+          <td>{{ message.date_sent }}</td>
+          <td>{{ message.short_content }}</td>
+          <td>
+            <div class="attachments">
+              {% for attachment in message.attachments.all %}
+              <a
+                href="{% url 'download_attachment' attachment.id %}"
+                class="attachment-link"
+                >{{ attachment.name }}</a
+              >
+              {% empty %}
+              <span>No attachments</span>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

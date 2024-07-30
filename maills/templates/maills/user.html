@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Page Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    
+    <link rel="stylesheet" type="text/css" href="{% static 'user.css' %}" />
+  </head>
+  <body>
+    <h2>Укажите данные от почты</h2>
+    <div class="container">
+      <form id="email_login" class="email-form" method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+        
+        
+        <input type="submit" value="Войти" />
+    </div>
+
+    <!-- <script type="text/javascript">
+      const form = document.getElementById("email_login");
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const email = form.email.value;
+        const password = form.password.value;
+        const emailType = form.email_type.value;
+      }); -->
+    </script>
+  </body>
+</html>
