@@ -25,12 +25,10 @@ class Email(models.Model):
     email = models.CharField(max_length=255)
     password = models.CharField(max_length=255)
     type = models.CharField(max_length=255, default="gmail.com", null=False)
-    
-    messages = models.ManyToManyField('Message',  default=1)
+    messages = models.ManyToManyField('Message', related_name='emails')  # Use related_name for reverse lookup
 
     def __str__(self):
         return self.email
-    
  
 class Message(models.Model):
     id = models.AutoField(primary_key=True)

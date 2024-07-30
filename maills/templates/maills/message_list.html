@@ -47,6 +47,8 @@
       document.addEventListener("DOMContentLoaded", () => {
         const progressBar = document.getElementById("progress-bar");
         const tableBody = document.querySelector("tbody");
+        const email = "{{ email|escapejs }}";
+        const emailType = "{{ email_type|escapejs }}";
 
         const socket = new WebSocket(
           "ws://" + window.location.host + "/ws/emails/"
@@ -54,6 +56,14 @@
 
         socket.onopen = function () {
           console.log("WebSocket connection opened");
+
+          socket.send(
+            JSON.stringify({
+              type: "fetch_emails",
+              email: email,
+              email_type: emailType,
+            })
+          );
         };
 
         socket.onmessage = function (e) {

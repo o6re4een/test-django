@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup  # For extracting text from HTML content
 from cosmoft import settings
 from maills.models import Email, File, Message
 from asgiref.sync import sync_to_async
+import uuid
 
 detach_dir = './maills/resources'
         
@@ -41,7 +42,8 @@ class EmailWorker:
 
         mail = imaplib.IMAP4_SSL(self.EMAIL_TYPE_SERVER[self.email_type])
         try:
-            mail.login(self.email, mail_obj.password)
+            print("Connecting to email server...", self.email.strip(), mail_obj.password.strip())
+            mail.login(self.email.strip(), mail_obj.password.strip())
             mail.select('inbox')
 
             # Fetch emails since the last saved date
@@ -88,6 +90,7 @@ class EmailWorker:
                     'type': 'progress_update',
                     'progress': progress,
                     'message': {
+                        "email_type": mail_obj.type,
                         'heading': subject,
                         'date_sent': date_sent.isoformat(),
                         'content': body[:50] + '...',
@@ -100,7 +103,7 @@ class EmailWorker:
 
     async def get_last_email_date(self):
         # Get the most recent email date for this email address from the database
-        last_email = await sync_to_async(Message.objects.order_by('-date_sent').first)()
+        last_email = await sync_to_async(Message.objects.filter(emails__email=self.email).order_by('-date_sent').first)()
         return last_email.date_sent if last_email else None
 
     async def is_duplicate_message(self, message_id: str) -> bool:
@@ -177,7 +180,7 @@ class EmailWorker:
 
             file_obj, created = await sync_to_async(File.objects.get_or_create)(name=file_name, path=att_path)
             if created:
-                await sync_to_async(message_obj.file_set.add)(file_obj)
+                await sync_to_async(message_obj.attachments.add)(file_obj)
             res.append(file_obj)
         return res
 
@@ -188,10 +191,18 @@ class EmailWorker:
             # Ensure the directory exists
             resources_dir = os.path.join(settings.BASE_DIR, 'maills', 'resources')
             os.makedirs(resources_dir, exist_ok=True)
+            filename = uuid.uuid4().hex
             print('Saving attachment:', filename)
             att_path = os.path.join(resources_dir, filename)
             if not os.path.isfile(att_path):
-                with open(att_path, 'wb') as fp:
-                    fp.write(part.get_payload(decode=True))
-                print('Downloaded file:', filename)
-            return att_path
+                try:
+                    with open(att_path, 'wb') as fp:
+                        fp.write(part.get_payload(decode=True))
+                    print('Downloaded file:', filename)
+                    return att_path
+                except:
+                    print('Error saving attachment:', filename)
+                    return None
+        return None
+
+        

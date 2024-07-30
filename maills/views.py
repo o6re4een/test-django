@@ -1,10 +1,13 @@
+import json
 import os
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.csrf import csrf_exempt
 
 from maills.forms import EmailForm
 from maills.models import Email, File
 from django.views.generic import TemplateView
+from django.contrib import messages
 
 from maills.utils.session import set_user_session
 
@@ -34,46 +37,12 @@ class UserView(TemplateView):
 
         
 
-class MessageListView(TemplateView):
-    template_name = 'maills/message-list.html'
-
-    def get_context_data(self, **kwargs):
-        
-       
-        context = super().get_context_data(**kwargs)
-        email = self.request.session.get('email')
-        email_type = self.request.session.get('email_type')
-        print("EMAIL: ", email, "TYPE: ", email_type)
-        found_email = Email.objects.filter(email=email, type=email_type)
-
-        messages = found_email.get().messages.all().prefetch_related('attachments')
-        context['messages'] = messages
-
-        context['email'] = email
-        context['email_type'] = email_type
-        return context
-    
-    
+def message_list_view(request, email_id):
+    email = get_object_or_404(Email, id=email_id)
+    messages = email.messages.all().prefetch_related('attachments')
+    return render(request, 'maills/message_list.html', {'email': email, 'messages': messages, 'email_type': email.type})
     
 def download_attachment(request, attachment_id):
-    # # Fetch the attachment record from the database
-    # try:
-    #     attachment = File.objects.get(id=attachment_id)
-    # except File.DoesNotExist:
-    #     raise Http404("Attachment does not exist")
-
-    # # File path
-    # file_path = attachment.path
-
-    # # Check if the file exists
-    # if not os.path.exists(file_path):
-    #     raise Http404("File not found")
-
-    # # Open and serve the file
-    # with open(file_path, 'rb') as file:
-    #     response = HttpResponse(file.read(), content_type='application/octet-stream')
-    #     response['Content-Disposition'] = f'attachment; filename={attachment.name}'
-    #     return response
     attachment = get_object_or_404(File, id=attachment_id)
     file_path = attachment.path
 
@@ -84,3 +53,59 @@ def download_attachment(request, attachment_id):
             return response
     except FileNotFoundError:
         raise Http404("Attachment not found")
+    
+
+@csrf_exempt
+def update_session(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            email_type = data.get('email_type')
+
+            # Check if email_type is valid
+            if email_type:
+                # Update the session with the new email type
+                request.session['email_type'] = email_type
+                # Retrieve the current email based on the updated email_type
+                email = request.session.get('email')
+
+                if Email.objects.filter(email=email, type=email_type).exists():
+                    return JsonResponse({'success': True, 'email': email, 'email_type': email_type})
+                else:
+                    return JsonResponse({'success': False, 'error': 'Email not found for this type'})
+
+            return JsonResponse({'success': False, 'error': 'Invalid email type'})
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'})
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@csrf_exempt
+def add_email(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            email = data.get('email')
+            email_type = data.get('email_type')
+            email_password = data.get('password')
+
+            if email and email_type:
+                # Create or get email entry
+                email_obj, created = Email.objects.get_or_create(email=email, type=email_type, password=email_password)
+                # Update session with the new email
+                request.session['email'] = email
+                request.session['email_type'] = email_type
+                if created:
+                    return JsonResponse({'success': True})
+                else:
+                    return JsonResponse({'success': False, 'error': 'Email already exists'})
+
+            return JsonResponse({'success': False, 'error': 'Invalid input'})
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'})
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+def email_list_view(request):
+    emails = Email.objects.all()
+    return render(request, 'maills/emails_list.html', {'emails': emails})

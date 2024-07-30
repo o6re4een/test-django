@@ -1,0 +1,42 @@
+version: "3"
+
+services:
+  web:
+    build: .
+    container_name: django_app
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres_db
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: cosmoft.settings
+    networks:
+      - mynetwork
+
+  postgres_db:
+    image: postgres:13
+    container_name: postgres_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+    ports:
+      - "5432:5432"
+    networks:
+      - mynetwork
+    env_file:
+      - .env
+
+networks:
+  mynetwork:
+
+volumes:
+  postgres_data:
